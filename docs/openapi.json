@@ -1,0 +1,2958 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CodeNest API",
+    "version": "1.0.0",
+    "description": "REST API for **CodeNest** — a knowledge-sharing social network for programmers.\n\n### How to try protected endpoints\n1. Open **POST /api/auth/login**, click **Try it out**, and log in (demo users are listed in the README).\n2. Copy the `token` from the response.\n3. Click the green **Authorize** button at the top, paste the token (without the word Bearer) and click **Authorize**.\n4. Now every 🔒 endpoint will send `Authorization: Bearer <token>` automatically.\n\nEvery error has the same shape: `{ \"error\": { \"code\", \"message\", \"details?\" } }`."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "This server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Server status"
+    },
+    {
+      "name": "Auth",
+      "description": "Register, log in, current user"
+    },
+    {
+      "name": "Me",
+      "description": "My personal area, profile and saved posts"
+    },
+    {
+      "name": "Users",
+      "description": "Profiles and following"
+    },
+    {
+      "name": "Posts",
+      "description": "Posts, likes and saves"
+    },
+    {
+      "name": "Comments",
+      "description": "Comments on posts"
+    },
+    {
+      "name": "Categories",
+      "description": "Post categories (managed by admins)"
+    },
+    {
+      "name": "Images",
+      "description": "Uploaded images"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Paste the token you got from /api/auth/login (without the word \"Bearer\")."
+      }
+    },
+    "parameters": {
+      "IdPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "example": 1
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "description": "Page number (starts at 1)"
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 10
+        },
+        "description": "Items per page (max 50)"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "NOT_FOUND"
+              },
+              "message": {
+                "type": "string",
+                "example": "Post not found"
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "USER",
+          "ADMIN"
+        ]
+      },
+      "ProgrammingLanguage": {
+        "type": "string",
+        "enum": [
+          "JAVASCRIPT",
+          "TYPESCRIPT",
+          "PYTHON",
+          "JAVA",
+          "CSHARP",
+          "CPP",
+          "C",
+          "PHP",
+          "GO",
+          "RUST",
+          "KOTLIN",
+          "SWIFT",
+          "SQL",
+          "HTML_CSS",
+          "OTHER"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ]
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "disconnected"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserSummary": {
+        "type": "object",
+        "description": "Short user info shown next to posts and comments",
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative URL — prefix with the API base URL"
+          }
+        }
+      },
+      "ListedUser": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "avatarUrl",
+          "bio"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CurrentUser": {
+        "type": "object",
+        "description": "The logged-in user (includes private email). Never includes the password.",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "bio",
+          "role",
+          "avatarUrl",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminUserListItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CurrentUser"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "postsCount": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "UserProfile": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "bio",
+          "role",
+          "avatarUrl",
+          "createdAt",
+          "postsCount",
+          "followersCount",
+          "followingCount",
+          "isFollowedByMe",
+          "isMe"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Visible only to the profile owner and to admins; null for everyone else"
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "postsCount": {
+            "type": "integer"
+          },
+          "followersCount": {
+            "type": "integer"
+          },
+          "followingCount": {
+            "type": "integer"
+          },
+          "isFollowedByMe": {
+            "type": "boolean"
+          },
+          "isMe": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "required": [
+          "user",
+          "stats"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/CurrentUser"
+          },
+          "stats": {
+            "type": "object",
+            "required": [
+              "postsCount",
+              "followersCount",
+              "followingCount",
+              "savedCount",
+              "likesReceived"
+            ],
+            "properties": {
+              "postsCount": {
+                "type": "integer",
+                "description": "Posts I wrote"
+              },
+              "followersCount": {
+                "type": "integer",
+                "description": "People following me"
+              },
+              "followingCount": {
+                "type": "integer",
+                "description": "People I follow"
+              },
+              "savedCount": {
+                "type": "integer",
+                "description": "Posts I saved"
+              },
+              "likesReceived": {
+                "type": "integer",
+                "description": "Total likes on all my posts"
+              }
+            }
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "required": [
+          "token",
+          "user"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT access token — send as \"Authorization: Bearer <token>\""
+          },
+          "user": {
+            "$ref": "#/components/schemas/CurrentUser"
+          }
+        }
+      },
+      "RegisterInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 50
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72,
+            "description": "At least 8 characters, with at least one letter and one digit"
+          }
+        }
+      },
+      "LoginInput": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateMeInput": {
+        "type": "object",
+        "description": "Send at least one field",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 50
+          },
+          "bio": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true,
+            "description": "Send \"\" or null to clear"
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "postsCount",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "postsCount": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CategoryInput": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true
+          }
+        }
+      },
+      "CategoryUpdateInput": {
+        "type": "object",
+        "description": "Send at least one field",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true
+          }
+        }
+      },
+      "Post": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "content",
+          "codeSnippet",
+          "language",
+          "imageUrl",
+          "category",
+          "author",
+          "likesCount",
+          "commentsCount",
+          "likedByMe",
+          "savedByMe",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "codeSnippet": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProgrammingLanguage"
+              }
+            ],
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "author": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "likesCount": {
+            "type": "integer"
+          },
+          "commentsCount": {
+            "type": "integer"
+          },
+          "likedByMe": {
+            "type": "boolean"
+          },
+          "savedByMe": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreatePostInput": {
+        "type": "object",
+        "required": [
+          "title",
+          "content",
+          "categoryId"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "codeSnippet": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "language": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProgrammingLanguage"
+              }
+            ],
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "UpdatePostInput": {
+        "type": "object",
+        "description": "Send only the fields you want to change (at least one)",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "codeSnippet": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "language": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProgrammingLanguage"
+              }
+            ],
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "LikeStatus": {
+        "type": "object",
+        "required": [
+          "likesCount",
+          "likedByMe"
+        ],
+        "properties": {
+          "likesCount": {
+            "type": "integer"
+          },
+          "likedByMe": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SaveStatus": {
+        "type": "object",
+        "required": [
+          "savedByMe"
+        ],
+        "properties": {
+          "savedByMe": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "required": [
+          "id",
+          "content",
+          "postId",
+          "author",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "content": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "integer"
+          },
+          "author": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CommentInput": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "PostPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Post"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 10
+          },
+          "total": {
+            "type": "integer",
+            "example": 23
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 3
+          }
+        }
+      },
+      "CommentPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 10
+          },
+          "total": {
+            "type": "integer",
+            "example": 23
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 3
+          }
+        }
+      },
+      "ListedUserPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListedUser"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 10
+          },
+          "total": {
+            "type": "integer",
+            "example": 23
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 3
+          }
+        }
+      },
+      "AdminUserPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserListItem"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 10
+          },
+          "total": {
+            "type": "integer",
+            "example": 23
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 3
+          }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "400 — invalid or missing fields",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Some fields are missing or invalid",
+                "details": [
+                  {
+                    "field": "title",
+                    "message": "Title must be at least 3 characters"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "401 — missing, invalid or expired token",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "TOKEN_MISSING",
+                "message": "Missing Bearer token in the Authorization header"
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "403 — logged in, but not allowed to do this",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "FORBIDDEN",
+                "message": "You do not have permission to do this"
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "404 — not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "NOT_FOUND",
+                "message": "Post not found"
+              }
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "409 — conflicts with existing data",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "CONFLICT",
+                "message": "A record with this value already exists"
+              }
+            }
+          }
+        }
+      },
+      "FileTooLarge": {
+        "description": "413 — image is larger than 2MB",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "FILE_TOO_LARGE",
+                "message": "Image must be 2MB or smaller"
+              }
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "429 — too many attempts",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "TOO_MANY_REQUESTS",
+                "message": "Too many attempts, please try again in a few minutes"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Check that the server and database are running",
+        "description": "Public. Returns 200 when everything works, 503 if the database is unreachable.",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                },
+                "example": {
+                  "status": "ok",
+                  "database": "connected",
+                  "timestamp": "2026-10-14T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create a new account (always role USER)",
+        "description": "Public. Returns a token so the user is logged in right away.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterInput"
+              },
+              "example": {
+                "name": "Maya Israeli",
+                "email": "maya@example.com",
+                "password": "Secret123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                },
+                "example": {
+                  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  "user": {
+                    "id": 5,
+                    "name": "Maya Israeli",
+                    "email": "maya@example.com",
+                    "bio": null,
+                    "role": "USER",
+                    "avatarUrl": null,
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "409": {
+            "description": "Email already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "EMAIL_TAKEN",
+                    "message": "An account with this email already exists"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log in and get a JWT token",
+        "description": "Public. Copy the `token` from the response and paste it into **Authorize**.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              },
+              "example": {
+                "email": "noa@codenest.dev",
+                "password": "User1234!"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                },
+                "example": {
+                  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  "user": {
+                    "id": 2,
+                    "name": "Noa Cohen",
+                    "email": "noa@codenest.dev",
+                    "bio": "Frontend developer who loves TypeScript",
+                    "role": "USER",
+                    "avatarUrl": null,
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "description": "Wrong email or password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_CREDENTIALS",
+                    "message": "Email or password is incorrect"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Who am I? (the user of the current token)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/CurrentUser"
+                    }
+                  }
+                },
+                "example": {
+                  "user": {
+                    "id": 2,
+                    "name": "Noa Cohen",
+                    "email": "noa@codenest.dev",
+                    "bio": "Frontend developer who loves TypeScript",
+                    "role": "USER",
+                    "avatarUrl": null,
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/users/me/dashboard": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "My personal area — profile + counters in one call",
+        "description": "For the \"My posts\" tab use `GET /api/posts?authorId=<my id>`; for the \"Saved\" tab use `GET /api/users/me/saved-posts`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                },
+                "example": {
+                  "user": {
+                    "id": 2,
+                    "name": "Noa Cohen",
+                    "email": "noa@codenest.dev",
+                    "bio": "Frontend developer who loves TypeScript",
+                    "role": "USER",
+                    "avatarUrl": null,
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  },
+                  "stats": {
+                    "postsCount": 3,
+                    "followersCount": 2,
+                    "followingCount": 1,
+                    "savedCount": 2,
+                    "likesReceived": 7
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "patch": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Edit my profile (name, bio)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeInput"
+              },
+              "example": {
+                "name": "Noa C.",
+                "bio": "Full-stack learner"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/CurrentUser"
+                    }
+                  }
+                },
+                "example": {
+                  "user": {
+                    "id": 2,
+                    "name": "Noa C.",
+                    "email": "noa@codenest.dev",
+                    "bio": "Full-stack learner",
+                    "role": "USER",
+                    "avatarUrl": null,
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/users/me/avatar": {
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Upload / replace my profile picture",
+        "description": "Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPG, PNG or WEBP, up to 2MB"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile picture saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/CurrentUser"
+                    }
+                  }
+                },
+                "example": {
+                  "user": {
+                    "id": 2,
+                    "name": "Noa Cohen",
+                    "email": "noa@codenest.dev",
+                    "bio": "Frontend developer who loves TypeScript",
+                    "role": "USER",
+                    "avatarUrl": "/api/images/9d1c0a52-2f7e-4c3b-8a6d-5e4f3b2a1c0d",
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "$ref": "#/components/responses/FileTooLarge"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Remove my profile picture",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success — no content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/users/me/saved-posts": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "My saved posts (private — only mine)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved posts, most recently saved first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": 12,
+                      "title": "Tip: Optional chaining",
+                      "content": "Instead of checking every level of an object, use ?. to stop safely at the first null.",
+                      "codeSnippet": "const city = user?.address?.city;",
+                      "language": "JAVASCRIPT",
+                      "imageUrl": "/api/images/3f2b6a10-6c1e-4e0b-9c55-1f4a7c2d9e91",
+                      "category": {
+                        "id": 1,
+                        "name": "Tips"
+                      },
+                      "author": {
+                        "id": 2,
+                        "name": "Noa Cohen",
+                        "avatarUrl": null
+                      },
+                      "likesCount": 5,
+                      "commentsCount": 2,
+                      "likedByMe": true,
+                      "savedByMe": true,
+                      "createdAt": "2026-10-14T09:30:00.000Z",
+                      "updatedAt": "2026-10-14T09:30:00.000Z"
+                    }
+                  ],
+                  "page": 1,
+                  "limit": 10,
+                  "total": 1,
+                  "totalPages": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "👑 Admin: list all users (with email and role)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in name or email"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": 2,
+                      "name": "Noa Cohen",
+                      "email": "noa@codenest.dev",
+                      "bio": "Frontend developer who loves TypeScript",
+                      "role": "USER",
+                      "avatarUrl": null,
+                      "createdAt": "2026-10-01T09:00:00.000Z",
+                      "postsCount": 3
+                    }
+                  ],
+                  "page": 1,
+                  "limit": 10,
+                  "total": 1,
+                  "totalPages": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "A user's public profile",
+        "description": "The email is returned only for your own profile or if you are an admin (otherwise null).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/UserProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "user": {
+                    "id": 2,
+                    "name": "Noa Cohen",
+                    "email": null,
+                    "bio": "Frontend developer who loves TypeScript",
+                    "role": "USER",
+                    "avatarUrl": null,
+                    "createdAt": "2026-10-01T09:00:00.000Z",
+                    "postsCount": 3,
+                    "followersCount": 2,
+                    "followingCount": 1,
+                    "isFollowedByMe": true,
+                    "isMe": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/followers": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "People who follow this user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Followers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListedUserPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": 3,
+                      "name": "Dan Levi",
+                      "avatarUrl": null,
+                      "bio": "Backend & Python"
+                    }
+                  ],
+                  "page": 1,
+                  "limit": 10,
+                  "total": 1,
+                  "totalPages": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/following": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "People this user follows",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Following",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListedUserPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": 2,
+                      "name": "Noa Cohen",
+                      "avatarUrl": null,
+                      "bio": null
+                    }
+                  ],
+                  "page": 1,
+                  "limit": 10,
+                  "total": 1,
+                  "totalPages": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/follow": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Follow this user",
+        "description": "Following someone you already follow is harmless (still 204). You cannot follow yourself.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success — no content"
+          },
+          "400": {
+            "description": "Invalid id, or trying to follow yourself",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "CANNOT_FOLLOW_SELF",
+                    "message": "You cannot follow yourself"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Stop following this user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success — no content"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/posts": {
+      "get": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "List posts — search, filter, sort and pages",
+        "description": "All filters can be combined. Example: `/api/posts?search=react&language=TYPESCRIPT&sort=popular`",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Text in title or content (case-insensitive)"
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ProgrammingLanguage"
+            }
+          },
+          {
+            "name": "authorId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Posts of one user (profile page / \"My posts\")"
+          },
+          {
+            "name": "feed",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "following"
+              ],
+              "default": "all"
+            },
+            "description": "\"following\" = only posts by people I follow"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "popular"
+              ],
+              "default": "newest"
+            },
+            "description": "\"popular\" = most likes first"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of posts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": 12,
+                      "title": "Tip: Optional chaining",
+                      "content": "Instead of checking every level of an object, use ?. to stop safely at the first null.",
+                      "codeSnippet": "const city = user?.address?.city;",
+                      "language": "JAVASCRIPT",
+                      "imageUrl": "/api/images/3f2b6a10-6c1e-4e0b-9c55-1f4a7c2d9e91",
+                      "category": {
+                        "id": 1,
+                        "name": "Tips"
+                      },
+                      "author": {
+                        "id": 2,
+                        "name": "Noa Cohen",
+                        "avatarUrl": null
+                      },
+                      "likesCount": 5,
+                      "commentsCount": 2,
+                      "likedByMe": true,
+                      "savedByMe": false,
+                      "createdAt": "2026-10-14T09:30:00.000Z",
+                      "updatedAt": "2026-10-14T09:30:00.000Z"
+                    }
+                  ],
+                  "page": 1,
+                  "limit": 10,
+                  "total": 1,
+                  "totalPages": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Create a post",
+        "description": "The author is always the logged-in user. To add an image, call `PUT /api/posts/{id}/image` afterwards.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostInput"
+              },
+              "example": {
+                "title": "Tip: Optional chaining",
+                "content": "Instead of checking every level of an object, use ?. to stop safely at the first null.",
+                "codeSnippet": "const city = user?.address?.city;",
+                "language": "JAVASCRIPT",
+                "categoryId": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Post created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "post": {
+                      "$ref": "#/components/schemas/Post"
+                    }
+                  }
+                },
+                "example": {
+                  "post": {
+                    "id": 12,
+                    "title": "Tip: Optional chaining",
+                    "content": "Instead of checking every level of an object, use ?. to stop safely at the first null.",
+                    "codeSnippet": "const city = user?.address?.city;",
+                    "language": "JAVASCRIPT",
+                    "imageUrl": null,
+                    "category": {
+                      "id": 1,
+                      "name": "Tips"
+                    },
+                    "author": {
+                      "id": 2,
+                      "name": "Noa Cohen",
+                      "avatarUrl": null
+                    },
+                    "likesCount": 0,
+                    "commentsCount": 0,
+                    "likedByMe": false,
+                    "savedByMe": false,
+                    "createdAt": "2026-10-14T09:30:00.000Z",
+                    "updatedAt": "2026-10-14T09:30:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}": {
+      "get": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Get one post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The post",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "post": {
+                      "$ref": "#/components/schemas/Post"
+                    }
+                  }
+                },
+                "example": {
+                  "post": {
+                    "id": 12,
+                    "title": "Tip: Optional chaining",
+                    "content": "Instead of checking every level of an object, use ?. to stop safely at the first null.",
+                    "codeSnippet": "const city = user?.address?.city;",
+                    "language": "JAVASCRIPT",
+                    "imageUrl": "/api/images/3f2b6a10-6c1e-4e0b-9c55-1f4a7c2d9e91",
+                    "category": {
+                      "id": 1,
+                      "name": "Tips"
+                    },
+                    "author": {
+                      "id": 2,
+                      "name": "Noa Cohen",
+                      "avatarUrl": null
+                    },
+                    "likesCount": 5,
+                    "commentsCount": 2,
+                    "likedByMe": true,
+                    "savedByMe": false,
+                    "createdAt": "2026-10-14T09:30:00.000Z",
+                    "updatedAt": "2026-10-14T09:30:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Edit my post (owner only)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePostInput"
+              },
+              "example": {
+                "title": "Tip: Optional chaining in JS"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated post",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "post": {
+                      "$ref": "#/components/schemas/Post"
+                    }
+                  }
+                },
+                "example": {
+                  "post": {
+                    "id": 12,
+                    "title": "Tip: Optional chaining in JS",
+                    "content": "Instead of checking every level of an object, use ?. to stop safely at the first null.",
+                    "codeSnippet": "const city = user?.address?.city;",
+                    "language": "JAVASCRIPT",
+                    "imageUrl": "/api/images/3f2b6a10-6c1e-4e0b-9c55-1f4a7c2d9e91",
+                    "category": {
+                      "id": 1,
+                      "name": "Tips"
+                    },
+                    "author": {
+                      "id": 2,
+                      "name": "Noa Cohen",
+                      "avatarUrl": null
+                    },
+                    "likesCount": 5,
+                    "commentsCount": 2,
+                    "likedByMe": true,
+                    "savedByMe": false,
+                    "createdAt": "2026-10-14T09:30:00.000Z",
+                    "updatedAt": "2026-10-14T09:30:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Delete a post (owner or 👑 admin)",
+        "description": "Also deletes its comments, likes, saves and image.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success — no content"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/image": {
+      "put": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Upload / replace the post image (owner only)",
+        "description": "Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPG, PNG or WEBP, up to 2MB"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Post with its new image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "post": {
+                      "$ref": "#/components/schemas/Post"
+                    }
+                  }
+                },
+                "example": {
+                  "post": {
+                    "id": 12,
+                    "title": "Tip: Optional chaining",
+                    "content": "Instead of checking every level of an object, use ?. to stop safely at the first null.",
+                    "codeSnippet": "const city = user?.address?.city;",
+                    "language": "JAVASCRIPT",
+                    "imageUrl": "/api/images/3f2b6a10-6c1e-4e0b-9c55-1f4a7c2d9e91",
+                    "category": {
+                      "id": 1,
+                      "name": "Tips"
+                    },
+                    "author": {
+                      "id": 2,
+                      "name": "Noa Cohen",
+                      "avatarUrl": null
+                    },
+                    "likesCount": 5,
+                    "commentsCount": 2,
+                    "likedByMe": true,
+                    "savedByMe": false,
+                    "createdAt": "2026-10-14T09:30:00.000Z",
+                    "updatedAt": "2026-10-14T09:30:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/FileTooLarge"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Remove the post image (owner only)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success — no content"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/like": {
+      "post": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Like a post",
+        "description": "Liking twice is harmless — the like is counted once.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Like status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LikeStatus"
+                },
+                "example": {
+                  "likesCount": 6,
+                  "likedByMe": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Remove my like",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Like status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LikeStatus"
+                },
+                "example": {
+                  "likesCount": 5,
+                  "likedByMe": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/save": {
+      "post": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Save a post for later",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Save status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveStatus"
+                },
+                "example": {
+                  "savedByMe": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Remove from my saved posts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Save status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveStatus"
+                },
+                "example": {
+                  "savedByMe": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/comments": {
+      "get": {
+        "tags": [
+          "Comments"
+        ],
+        "summary": "Comments of a post (oldest first)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of comments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": 7,
+                      "content": "Great tip, thanks!",
+                      "postId": 12,
+                      "author": {
+                        "id": 3,
+                        "name": "Dan Levi",
+                        "avatarUrl": null
+                      },
+                      "createdAt": "2026-10-14T10:00:00.000Z"
+                    }
+                  ],
+                  "page": 1,
+                  "limit": 10,
+                  "total": 1,
+                  "totalPages": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Comments"
+        ],
+        "summary": "Add a comment to a post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentInput"
+              },
+              "example": {
+                "content": "Great tip, thanks!"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Comment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "comment": {
+                      "$ref": "#/components/schemas/Comment"
+                    }
+                  }
+                },
+                "example": {
+                  "comment": {
+                    "id": 7,
+                    "content": "Great tip, thanks!",
+                    "postId": 12,
+                    "author": {
+                      "id": 3,
+                      "name": "Dan Levi",
+                      "avatarUrl": null
+                    },
+                    "createdAt": "2026-10-14T10:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/comments/{id}": {
+      "delete": {
+        "tags": [
+          "Comments"
+        ],
+        "summary": "Delete a comment (owner or 👑 admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success — no content"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "All categories (for filters and the post form)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Categories sorted by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Category"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": 1,
+                      "name": "Tips",
+                      "description": "Short, practical coding tips",
+                      "postsCount": 4,
+                      "createdAt": "2026-10-01T09:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "👑 Admin: add a category",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryInput"
+              },
+              "example": {
+                "name": "DevOps",
+                "description": "CI/CD, Docker and the cloud"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Category created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "$ref": "#/components/schemas/Category"
+                    }
+                  }
+                },
+                "example": {
+                  "category": {
+                    "id": 6,
+                    "name": "DevOps",
+                    "description": "CI/CD, Docker and the cloud",
+                    "postsCount": 0,
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "Name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "CATEGORY_EXISTS",
+                    "message": "A category named \"DevOps\" already exists"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categories/{id}": {
+      "patch": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "👑 Admin: edit a category",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryUpdateInput"
+              },
+              "example": {
+                "description": "Short and practical tips"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "$ref": "#/components/schemas/Category"
+                    }
+                  }
+                },
+                "example": {
+                  "category": {
+                    "id": 1,
+                    "name": "Tips",
+                    "description": "Short and practical tips",
+                    "postsCount": 4,
+                    "createdAt": "2026-10-01T09:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "👑 Admin: delete an empty category",
+        "description": "A category that still has posts cannot be deleted (409 CATEGORY_IN_USE).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success — no content"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Category still has posts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "CATEGORY_IN_USE",
+                    "message": "This category still has 4 post(s). Move or delete them first."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/{id}": {
+      "get": {
+        "tags": [
+          "Images"
+        ],
+        "summary": "Get an uploaded image file",
+        "description": "Public (an <img> tag cannot send a token). Ids are random UUIDs that cannot be guessed. Use the `imageUrl` / `avatarUrl` you got from other endpoints.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image file",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    }
+  }
+}

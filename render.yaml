@@ -1,0 +1,35 @@
+# Render Blueprint for the CodeNest API.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# The database is NOT created here on purpose — use a free PostgreSQL provider
+# (e.g. Neon or Supabase) and paste its connection string into DATABASE_URL.
+services:
+  - type: web
+    name: codenest-api
+    runtime: node
+    plan: free
+    # --include=dev: TypeScript and type packages are needed to build
+    buildCommand: npm ci --include=dev && npm run build
+    # Applies database migrations, runs the (safe, repeatable) seed, then starts the server
+    startCommand: npm run render:start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # you will be asked to paste it
+      - key: JWT_SECRET
+        generateValue: true # Render creates a strong random secret
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: CORS_ORIGIN
+        value: "*" # later: your React site address, e.g. https://my-codenest.vercel.app
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_DEMO_PASSWORD
+        sync: false

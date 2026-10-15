@@ -1,0 +1,172 @@
+// CodeNest database schema (PostgreSQL + Prisma)
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// The two kinds of users in the system.
+enum Role {
+  USER
+  ADMIN
+}
+
+/// Programming language a post is about (optional on a post).
+enum ProgrammingLanguage {
+  JAVASCRIPT
+  TYPESCRIPT
+  PYTHON
+  JAVA
+  CSHARP
+  CPP
+  C
+  PHP
+  GO
+  RUST
+  KOTLIN
+  SWIFT
+  SQL
+  HTML_CSS
+  OTHER
+}
+
+/// A registered programmer.
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(50)
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String   @map("password_hash")
+  bio           String?  @db.VarChar(300)
+  role          Role     @default(USER)
+  avatarImageId String?  @unique @map("avatar_image_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  avatarImage Image?      @relation("UserAvatar", fields: [avatarImageId], references: [id], onDelete: SetNull)
+  posts       Post[]
+  comments    Comment[]
+  likes       Like[]
+  savedPosts  SavedPost[]
+  /// Follow rows where this user is the follower ("I follow them").
+  following   Follow[]    @relation("UserFollowing")
+  /// Follow rows where this user is being followed ("they follow me").
+  followers   Follow[]    @relation("UserFollowers")
+
+  @@map("users")
+}
+
+/// A post category, managed by admins (e.g. "Tips", "Bugs & Fixes").
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(40)
+  description String?  @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  posts Post[]
+
+  @@map("categories")
+}
+
+/// The central object: a knowledge-sharing post.
+model Post {
+  id          Int                  @id @default(autoincrement())
+  title       String               @db.VarChar(120)
+  content     String               @db.Text
+  codeSnippet String?              @map("code_snippet") @db.Text
+  language    ProgrammingLanguage?
+  categoryId  Int                  @map("category_id")
+  authorId    Int                  @map("author_id")
+  imageId     String?              @unique @map("image_id") @db.Uuid
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  // A category that still has posts cannot be deleted (Restrict).
+  category Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author   User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  image    Image?      @relation("PostImage", fields: [imageId], references: [id], onDelete: SetNull)
+  comments Comment[]
+  likes    Like[]
+  savedBy  SavedPost[]
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@map("posts")
+}
+
+/// A comment written on a post.
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.VarChar(1000)
+  postId    Int      @map("post_id")
+  authorId  Int      @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("comments")
+}
+
+/// "User X liked post Y". The composite key prevents liking twice.
+model Like {
+  userId    Int      @map("user_id")
+  postId    Int      @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+  @@index([postId])
+  @@map("likes")
+}
+
+/// "User X saved post Y for later". Private to the user.
+model SavedPost {
+  userId    Int      @map("user_id")
+  postId    Int      @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+  @@index([postId])
+  @@map("saved_posts")
+}
+
+/// "followerId follows followingId". A CHECK constraint (see migration) blocks self-follow.
+model Follow {
+  followerId  Int      @map("follower_id")
+  followingId Int      @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+/// An uploaded image (avatar or post image), stored inside the database
+/// so it survives restarts on free cloud hosting.
+model Image {
+  id        String   @id @default(uuid()) @db.Uuid
+  data      Bytes
+  mimeType  String   @map("mime_type") @db.VarChar(50)
+  size      Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation("UserAvatar")
+  post Post? @relation("PostImage")
+
+  @@map("images")
+}
