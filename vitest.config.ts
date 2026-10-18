@@ -17,6 +17,8 @@ export default defineConfig({
       JWT_EXPIRES_IN: '1h',
       CORS_ORIGIN: '*',
       BCRYPT_ROUNDS: '4',
+      // Tests never touch the real Cloudflare R2 — files are kept in memory (see MemoryStorage).
+      STORAGE_DRIVER: 'memory',
     },
   },
 });

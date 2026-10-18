@@ -2,7 +2,7 @@
 
 שרת Backend לרשת חברתית לשיתוף ידע בין מתכנתים: פוסטים עם קטעי קוד, תגובות, לייקים, מעקב אחרי משתמשים ושמירת פוסטים.
 
-**טכנולוגיות:** Node.js 22 · Express 5 · TypeScript (strict) · PostgreSQL · Prisma 6 · Zod · JWT · bcrypt · Swagger (OpenAPI 3) · Vitest
+**טכנולוגיות:** Node.js 22 · Express 5 · TypeScript (strict) · PostgreSQL · Prisma 6 · Cloudflare R2 (S3 API) · Zod · JWT · bcrypt · Swagger (OpenAPI 3) · Vitest
 
 📄 **קבצים חשובים:**
 - [`START-HERE.md`](START-HERE.md): העלאה ל־GitHub, ל־Neon ול־Render, צעד אחר צעד
@@ -77,6 +77,8 @@ npm run dev
 | `npm run db:reset` | ⚠️ מוחק הכול, יוצר מחדש ומריץ Seed |
 | `npm run db:studio` | ממשק גרפי לצפייה בטבלאות |
 | `npm run docs:export` | עדכון `docs/openapi.json` |
+| `npm run images:migrate-to-r2 -- [--dry-run]` | העברת תמונות ישנות מהמסד ל־R2, עם אימות (ראי `docs/R2-MIGRATION.md`) |
+| `npm run images:verify` / `images:backup` / `images:purge-db-data` / `images:cleanup-orphans` | כלי תחזוקה לאחסון התמונות |
 
 ---
 
@@ -142,4 +144,8 @@ backend-project/
 - אילוצי CHECK במסד הנתונים (למשל: אי אפשר לעקוב אחרי עצמך).
 
 ## איפה נשמרות התמונות
-התמונות נשמרות **בתוך PostgreSQL** (טבלת `images`), ולא בדיסק, כי הדיסק של שרתים חינמיים בענן נמחק בכל הפעלה מחדש. ההגבלה היא 2MB לתמונה, בפורמטים JPG, PNG או WEBP.
+קובצי התמונות נשמרים ב־**Cloudflare R2** (אחסון אובייקטים תואם S3, ב־Bucket פרטי). ב־PostgreSQL נשמרים רק מפתח הקובץ (`storage_key`), הסוג, הגודל והקשרים לפוסטים ולמשתמשים.
+`GET /api/images/:id` מחזיר הפניה (302) לכתובת חתומה וזמנית. ההגבלה היא 2MB לתמונה, בפורמטים JPG, PNG או WEBP.
+- הגדרות: משתני `R2_*` (ראי `.env.example`). בלי הגדרות R2, העלאות מחזירות 503 ושאר המערכת עובדת.
+- בהרצה מקומית בלי R2 אפשר להגדיר `STORAGE_DRIVER=memory` (התמונות נמחקות בכל הפעלה מחדש).
+- העברת תמונות ישנות מהמסד, גיבוי ואימות: [`docs/R2-MIGRATION.md`](docs/R2-MIGRATION.md).

@@ -5,7 +5,7 @@ describe('Health & basics', () => {
   it('GET /api/health → 200 with database connected', async () => {
     const res = await api().get('/api/health');
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ status: 'ok', database: 'connected' });
+    expect(res.body).toMatchObject({ status: 'ok', database: 'connected', storage: 'memory' });
     expect(typeof res.body.timestamp).toBe('string');
   });
 

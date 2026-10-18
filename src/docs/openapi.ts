@@ -197,6 +197,11 @@ export const openApiDocument = {
         properties: {
           status: { type: 'string', enum: ['ok', 'error'] },
           database: { type: 'string', enum: ['connected', 'disconnected'] },
+          storage: {
+            type: 'string',
+            enum: ['r2', 'memory', 'not_configured'],
+            description: 'Active image storage. "r2" = Cloudflare R2 (production)',
+          },
           timestamp: { type: 'string', format: 'date-time' },
         },
       },
@@ -447,6 +452,15 @@ export const openApiDocument = {
       FileTooLarge: jsonResponse('413 — image is larger than 2MB', schemaRef('Error'), {
         error: { code: 'FILE_TOO_LARGE', message: 'Image must be 2MB or smaller' },
       }),
+      StorageError: jsonResponse('502 — image storage (Cloudflare R2) is temporarily unavailable', schemaRef('Error'), {
+        error: { code: 'STORAGE_ERROR', message: 'Image storage is temporarily unavailable, please try again' },
+      }),
+      StorageNotConfigured: jsonResponse('503 — image storage is not configured on the server', schemaRef('Error'), {
+        error: {
+          code: 'STORAGE_NOT_CONFIGURED',
+          message: 'Image storage is not configured on the server (missing Cloudflare R2 settings)',
+        },
+      }),
       TooManyRequests: jsonResponse('429 — too many attempts', schemaRef('Error'), {
         error: { code: 'TOO_MANY_REQUESTS', message: 'Too many attempts, please try again in a few minutes' },
       }),
@@ -463,6 +477,7 @@ export const openApiDocument = {
           200: jsonResponse('Server is healthy', schemaRef('Health'), {
             status: 'ok',
             database: 'connected',
+            storage: 'r2',
             timestamp: '2026-10-14T10:00:00.000Z',
           }),
           503: jsonResponse('Database is not reachable', schemaRef('Health')),
@@ -570,7 +585,9 @@ export const openApiDocument = {
       put: {
         tags: ['Me'],
         summary: 'Upload / replace my profile picture',
-        description: 'Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB).',
+        description:
+          'Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB). ' +
+          'The file is stored in Cloudflare R2; the old image file is removed.',
         security: bearer,
         requestBody: imageUploadBody,
         responses: {
@@ -582,6 +599,8 @@ export const openApiDocument = {
           400: responseRef('ValidationError'),
           401: responseRef('Unauthorized'),
           413: responseRef('FileTooLarge'),
+          502: responseRef('StorageError'),
+          503: responseRef('StorageNotConfigured'),
         },
       },
       delete: {
@@ -804,7 +823,9 @@ export const openApiDocument = {
       put: {
         tags: ['Posts'],
         summary: 'Upload / replace the post image (owner only)',
-        description: 'Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB).',
+        description:
+          'Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB). ' +
+          'The file is stored in Cloudflare R2; the old image file is removed.',
         security: bearer,
         parameters: [paramRef('IdPath')],
         requestBody: imageUploadBody,
@@ -815,6 +836,8 @@ export const openApiDocument = {
           403: responseRef('Forbidden'),
           404: responseRef('NotFound'),
           413: responseRef('FileTooLarge'),
+          502: responseRef('StorageError'),
+          503: responseRef('StorageNotConfigured'),
         },
       },
       delete: {
@@ -1002,21 +1025,36 @@ export const openApiDocument = {
       get: {
         tags: ['Images'],
         summary: 'Get an uploaded image file',
-        description:
-          'Public (an <img> tag cannot send a token). Ids are random UUIDs that cannot be guessed. Use the `imageUrl` / `avatarUrl` you got from other endpoints.',
+        description: [
+          'Public (an <img> tag cannot send a token). Ids are random UUIDs that cannot be guessed.',
+          'Use the `imageUrl` / `avatarUrl` you got from other endpoints directly in `<img src>`.',
+          '',
+          '- Images stored in **Cloudflare R2** answer **302** with a short-lived signed URL; browsers follow it automatically.',
+          '- Older images not migrated yet are sent directly (**200**).',
+          '',
+          '_Swagger "Try it out" may show the redirect as a network error because of CORS — open the URL in a new tab instead._',
+        ].join('\n'),
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
         responses: {
           200: {
-            description: 'The image file',
+            description: 'The image file (legacy images stored in the database)',
             content: {
               'image/jpeg': { schema: { type: 'string', format: 'binary' } },
               'image/png': { schema: { type: 'string', format: 'binary' } },
               'image/webp': { schema: { type: 'string', format: 'binary' } },
             },
           },
+          302: {
+            description: 'Redirect to the image in Cloudflare R2 (signed URL, valid for a limited time)',
+            headers: {
+              Location: { description: 'Temporary URL of the image file', schema: { type: 'string', format: 'uri' } },
+            },
+          },
           404: responseRef('NotFound'),
+          502: responseRef('StorageError'),
+          503: responseRef('StorageNotConfigured'),
         },
       },
     },

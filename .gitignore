@@ -9,6 +9,9 @@ dist/
 .env.*
 !.env.example
 
+# Local image backups (may contain user images)
+image-backup*/
+
 # Logs and temporary files
 *.log
 npm-debug.log*

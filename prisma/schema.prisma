@@ -156,14 +156,21 @@ model Follow {
   @@map("follows")
 }
 
-/// An uploaded image (avatar or post image), stored inside the database
-/// so it survives restarts on free cloud hosting.
+/// An uploaded image (avatar or post image).
+/// The file itself lives in Cloudflare R2 object storage; this row keeps only
+/// the object key, metadata and the relations to users and posts.
 model Image {
-  id        String   @id @default(uuid()) @db.Uuid
-  data      Bytes
-  mimeType  String   @map("mime_type") @db.VarChar(50)
-  size      Int
-  createdAt DateTime @default(now()) @map("created_at")
+  id                String    @id @default(uuid()) @db.Uuid
+  /// Object key in the R2 bucket, e.g. "images/<id>.png". NULL only for legacy rows not migrated yet.
+  storageKey        String?   @unique @map("storage_key") @db.VarChar(512)
+  /// When the object in R2 was last confirmed to exist with the right size and content.
+  storageVerifiedAt DateTime? @map("storage_verified_at")
+  /// LEGACY: image bytes from before the move to R2. Never written for new uploads;
+  /// cleared by `npm run images:purge-db-data` only after a verified migration.
+  data              Bytes?
+  mimeType          String    @map("mime_type") @db.VarChar(50)
+  size              Int
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   user User? @relation("UserAvatar")
   post Post? @relation("PostImage")

@@ -23,12 +23,19 @@
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "docs:export": "tsx scripts/export-openapi.ts",
+    "images:backup": "tsx src/scripts/images.ts backup",
+    "images:migrate-to-r2": "tsx src/scripts/images.ts migrate",
+    "images:verify": "tsx src/scripts/images.ts verify",
+    "images:purge-db-data": "tsx src/scripts/images.ts purge",
+    "images:cleanup-orphans": "tsx src/scripts/images.ts orphans",
     "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1152.0",
+    "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

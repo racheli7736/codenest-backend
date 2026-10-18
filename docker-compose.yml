@@ -21,5 +21,17 @@ services:
       timeout: 5s
       retries: 10
 
+  # Optional local S3-compatible server (same API as Cloudflare R2), used by the storage
+  # integration tests:  docker compose --profile s3 up -d   (local-only test credentials)
+  s3:
+    image: chrislusf/seaweedfs:3.97
+    container_name: codenest-s3
+    profiles: ["s3"]
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    volumes:
+      - ./docker/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    ports:
+      - "8333:8333"
+
 volumes:
   codenest-data:

@@ -2,15 +2,25 @@ import type { ProgrammingLanguage, Role } from '@prisma/client';
 import request from 'supertest';
 import { createApp } from '../src/app';
 import { prisma } from '../src/lib/prisma';
+import { MemoryStorage, getStorage } from '../src/lib/storage';
 import { signAccessToken } from '../src/utils/jwt';
 import { hashPassword } from '../src/utils/password';
 
 export { prisma };
+
+/** The in-memory object storage the app uses during tests (stands in for Cloudflare R2). */
+export function memoryStorage() {
+  const storage = getStorage();
+  if (!(storage instanceof MemoryStorage)) throw new Error('Tests must run with STORAGE_DRIVER=memory');
+  return storage;
+}
 export const app = createApp();
 export const api = () => request(app);
 
 /** Empties every table so each test starts from a clean database. */
 export async function resetDatabase() {
+  const storage = getStorage();
+  if (storage instanceof MemoryStorage) storage.reset();
   await prisma.$executeRawUnsafe(
     'TRUNCATE TABLE "comments", "likes", "saved_posts", "follows", "posts", "categories", "users", "images" RESTART IDENTITY CASCADE',
   );
