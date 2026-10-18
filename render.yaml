@@ -27,6 +27,19 @@ services:
         value: 24h
       - key: CORS_ORIGIN
         value: "*" # later: your React site address, e.g. https://my-codenest.vercel.app
+      # ---- Image storage: Cloudflare R2 (set the secret values in the Render dashboard) ----
+      - key: STORAGE_DRIVER
+        value: r2
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: IMAGE_URL_TTL_SECONDS
+        value: "3600"
       - key: SEED_ADMIN_EMAIL
         sync: false
       - key: SEED_ADMIN_PASSWORD

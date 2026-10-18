@@ -46,7 +46,7 @@
 | `likes` | לייקים | user_id, post_id, created_at | PK משותף (user_id, post_id) · FKs (CASCADE) | לייק אחד לכל משתמש לכל פוסט |
 | `saved_posts` | שמורים | user_id, post_id, created_at | PK משותף · FKs (CASCADE) | שמירה אחת לכל משתמש לכל פוסט |
 | `follows` | מעקב | follower_id, following_id, created_at | PK משותף · FKs → users (CASCADE) | CHECK: follower ≠ following |
-| `images` | תמונות | id (UUID), data, mime_type, size, created_at | PK id | רק jpeg/png/webp, עד 2MB |
+| `images` | תמונות: הקובץ עצמו ב־Cloudflare R2, כאן רק הפניה | id (UUID), storage_key, storage_verified_at, mime_type, size, created_at (+ data ישן, נמחק אחרי העברה) | PK id · storage_key ייחודי | רק jpeg/png/webp, עד 2MB · חייב storage_key או data |
 
 **ערכי `role`:** USER, ADMIN.
 **ערכי `language`:** JAVASCRIPT, TYPESCRIPT, PYTHON, JAVA, CSHARP, CPP, C, PHP, GO, RUST, KOTLIN, SWIFT, SQL, HTML_CSS, OTHER.

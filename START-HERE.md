@@ -258,6 +258,62 @@ https://codenest-api.onrender.com/api/health
 | **הבקשה הראשונה איטית מאוד** | חצי דקה עד דקה | זה תקין במסלול החינמי. השרת נרדם אחרי 15 דקות בלי שימוש. |
 | **שכחתי את סיסמת המנהל** | 401 בהתחברות | שינוי `SEED_ADMIN_PASSWORD` **לא** משנה סיסמה קיימת (מטעמי אבטחה). הגדירי `SEED_ADMIN_EMAIL` חדש עם סיסמה חדשה ועשי Deploy מחדש. ייווצר מנהל נוסף. |
 
+## חלק ו: אחסון תמונות ב־Cloudflare R2
+
+קובצי התמונות נשמרים ב־**Cloudflare R2**. ב־Neon נשמרת רק ההפניה לקובץ. בלי ההגדרות האלה השרת עובד, אבל העלאת תמונות מחזירה 503.
+
+> ⚠️ לא יכולתי לבדוק את המסכים העדכניים של Cloudflare, אז ייתכן ששמות הכפתורים קצת שונים.
+> 💰 ל־R2 יש מסלול חינמי (לפי Cloudflare: 10GB אחסון בחודש, ובלי תשלום על הורדות). **ייתכן ש־Cloudflare יבקשו להוסיף אמצעי תשלום כדי להפעיל את R2**, גם כשהשימוש נשאר בתוך המסלול החינמי. בדקי את התנאים לפני שאת מאשרת.
+
+### 1. פתיחת חשבון והפעלת R2
+1. היכנסי ל־https://dash.cloudflare.com ולחצי **Sign up**.
+2. בתפריט הצד בחרי **R2 Object Storage**, ופעלי לפי ההוראות להפעלת השירות.
+
+### 2. יצירת Bucket
+1. **Create bucket**.
+2. **Bucket name:** `codenest-images`
+3. **Location:** Automatic (או אירופה).
+4. **אל** תפעילי גישה ציבורית (Public access). ה־Bucket נשאר **פרטי**, והשרת יוצר כתובות זמניות.
+
+### 3. יצירת מפתחות גישה (API Token)
+1. בעמוד R2 לחצי **Manage API tokens** (או **API**), ואז **Create API token**.
+2. **Permissions:** `Object Read & Write`.
+3. **Specify bucket:** רק `codenest-images`.
+4. לחצי **Create**. יוצגו לך:
+   - **Access Key ID**
+   - **Secret Access Key**: מוצג **פעם אחת בלבד**! העתיקי ושמרי במקום בטוח.
+   - **Account ID**: מופיע גם בכתובת ה־endpoint, `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`.
+5. 🔒 אל תשלחי את המפתחות בצ'אט ואל תכתבי אותם בקוד.
+
+### 4. הגדרה ב־Render
+ב־Render ← השירות `codenest-api` ← **Environment** ← **Add Environment Variable**:
+
+| Key | Value |
+|---|---|
+| `STORAGE_DRIVER` | `r2` |
+| `R2_ACCOUNT_ID` | ה־Account ID |
+| `R2_ACCESS_KEY_ID` | ה־Access Key ID |
+| `R2_SECRET_ACCESS_KEY` | ה־Secret Access Key |
+| `R2_BUCKET` | `codenest-images` |
+
+לחצי **Save Changes**. Render יפעיל את השרת מחדש.
+
+### 5. בדיקה
+- `https://<השרת-שלך>.onrender.com/api/health` צריך להציג `"storage": "r2"`.
+- ב־Swagger: Authorize, ואז **PUT /api/users/me/avatar**, העלאת תמונה, ופתיחת ה־`avatarUrl` שחזר בלשונית חדשה.
+- ב־Cloudflare, ב־Bucket, יופיע קובץ חדש בתיקייה `images/`.
+
+### 6. העברת תמונות ישנות (אם יש)
+ההוראות המלאות, כולל גיבוי לפני הכול, נמצאות ב־[`docs/R2-MIGRATION.md`](docs/R2-MIGRATION.md).
+
+### תקלות נפוצות ב־R2
+| תקלה | פתרון |
+|---|---|
+| `"storage": "not_configured"` ב־health | חסר אחד ממשתני `R2_*` ב־Render, או שיש בו רווח מיותר |
+| העלאה מחזירה **502 STORAGE_ERROR** | מפתח שגוי, Token בלי הרשאת Write, או שם Bucket שגוי. בדקי ב־Render ← Logs את השורה `[storage] upload failed` |
+| התמונה לא נפתחת (403 מ־R2) | הכתובת הזמנית פגה (אחרי `IMAGE_URL_TTL_SECONDS`). רענני את הדף, והשרת ייתן כתובת חדשה |
+| במחשב שלך התמונות לא נטענות | ייתכן שסינון האינטרנט (נטפרי) חוסם את `*.r2.cloudflarestorage.com`. בקשי פתיחה |
+
 ---
 
 ### מה הלאה?
