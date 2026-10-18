@@ -26,7 +26,7 @@ describe('Prisma schema & migrations', () => {
       SELECT conname FROM pg_constraint WHERE contype = 'c' ORDER BY conname`;
     const names = rows.map((row) => row.conname);
     expect(names).toEqual(
-      expect.arrayContaining(['follows_no_self_follow', 'images_size_limit', 'images_mime_type_allowed', 'posts_title_length']),
+      expect.arrayContaining(['follows_no_self_follow', 'images_size_limit', 'images_mime_type_allowed', 'posts_title_length', 'images_has_content', 'images_storage_key_format']),
     );
   });
 });

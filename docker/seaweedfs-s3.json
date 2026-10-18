@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "codenest-local",
+      "credentials": [{ "accessKey": "codenest", "secretKey": "codenest-local-only" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}
