@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { badRequest, notFound } from '../../utils/httpError';
 import { buildPage, toSkipTake } from '../../utils/pagination';
 import { currentUserSelect, imageUrl, toCurrentUser, toUserSummary } from '../../utils/serializers';
-import { toImageData } from '../images/images.service';
+import { getStorageKeys, removeStoredObjects, uploadAndLinkImage } from '../images/images.service';
 import { postInclude, toPostResponse } from '../posts/posts.serializer';
 import type { ListUsersQuery, UpdateMeInput } from './users.schemas';
 
@@ -45,26 +45,29 @@ export async function updateMe(userId: number, input: UpdateMeInput) {
 }
 
 export async function setAvatar(userId: number, file: Express.Multer.File | undefined) {
-  const imageData = toImageData(file);
   const current = await prisma.user.findUnique({ where: { id: userId }, select: { avatarImageId: true } });
   if (!current) throw notFound('User');
+  const oldStorageKeys = await getStorageKeys([current.avatarImageId]);
 
-  const user = await prisma.$transaction(async (tx) => {
-    const image = await tx.image.create({ data: imageData, select: { id: true } });
+  const user = await uploadAndLinkImage(file, async (tx, imageId) => {
     const updated = await tx.user.update({
       where: { id: userId },
-      data: { avatarImageId: image.id },
+      data: { avatarImageId: imageId },
       select: currentUserSelect,
     });
     if (current.avatarImageId) await tx.image.delete({ where: { id: current.avatarImageId } });
     return updated;
   });
+  await removeStoredObjects(oldStorageKeys);
   return toCurrentUser(user);
 }
 
 export async function removeAvatar(userId: number) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { avatarImageId: true } });
-  if (user?.avatarImageId) await prisma.image.delete({ where: { id: user.avatarImageId } });
+  if (!user?.avatarImageId) return;
+  const storageKeys = await getStorageKeys([user.avatarImageId]);
+  await prisma.image.delete({ where: { id: user.avatarImageId } }); // avatarImageId becomes NULL
+  await removeStoredObjects(storageKeys);
 }
 
 /** Admin only: all users including email and role. */

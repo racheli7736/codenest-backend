@@ -2,7 +2,7 @@ import type { Prisma, Role } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { badRequest, forbidden, notFound } from '../../utils/httpError';
 import { buildPage, toSkipTake } from '../../utils/pagination';
-import { toImageData } from '../images/images.service';
+import { getStorageKeys, removeStoredObjects, uploadAndLinkImage } from '../images/images.service';
 import { postInclude, toPostResponse } from './posts.serializer';
 import type { CreatePostInput, ListPostsQuery, UpdatePostInput } from './posts.schemas';
 
@@ -111,30 +111,36 @@ export async function deletePost(viewer: Viewer, postId: number) {
   if (post.authorId !== viewer.id && viewer.role !== 'ADMIN') {
     throw forbidden('You can only delete your own posts');
   }
-  // Comments, likes and saves are removed automatically (ON DELETE CASCADE). The image is removed here.
+  const storageKeys = await getStorageKeys([post.imageId]);
+  // Comments, likes and saves are removed automatically (ON DELETE CASCADE). The image row is removed here.
   await prisma.$transaction([
     prisma.post.delete({ where: { id: postId } }),
     ...(post.imageId ? [prisma.image.delete({ where: { id: post.imageId } })] : []),
   ]);
+  // The file in R2 is deleted only after the database change succeeded.
+  await removeStoredObjects(storageKeys);
 }
 
 export async function setPostImage(viewer: Viewer, postId: number, file: Express.Multer.File | undefined) {
   const post = await findPostOrThrow(postId);
   if (post.authorId !== viewer.id) throw forbidden('You can only change the image of your own posts');
-  const imageData = toImageData(file);
+  const oldStorageKeys = await getStorageKeys([post.imageId]);
 
-  await prisma.$transaction(async (tx) => {
-    const image = await tx.image.create({ data: imageData, select: { id: true } });
-    await tx.post.update({ where: { id: postId }, data: { imageId: image.id } });
+  await uploadAndLinkImage(file, async (tx, imageId) => {
+    await tx.post.update({ where: { id: postId }, data: { imageId } });
     if (post.imageId) await tx.image.delete({ where: { id: post.imageId } });
   });
+  await removeStoredObjects(oldStorageKeys);
   return loadPost(postId, viewer.id);
 }
 
 export async function removePostImage(viewer: Viewer, postId: number) {
   const post = await findPostOrThrow(postId);
   if (post.authorId !== viewer.id) throw forbidden('You can only change the image of your own posts');
-  if (post.imageId) await prisma.image.delete({ where: { id: post.imageId } }); // post.imageId becomes NULL
+  if (!post.imageId) return;
+  const storageKeys = await getStorageKeys([post.imageId]);
+  await prisma.image.delete({ where: { id: post.imageId } }); // post.imageId becomes NULL
+  await removeStoredObjects(storageKeys);
 }
 
 export async function likePost(viewer: Viewer, postId: number) {

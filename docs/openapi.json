@@ -171,6 +171,15 @@
               "disconnected"
             ]
           },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "r2",
+              "memory",
+              "not_configured"
+            ],
+            "description": "Active image storage. \"r2\" = Cloudflare R2 (production)"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time"
@@ -978,6 +987,38 @@
           }
         }
       },
+      "StorageError": {
+        "description": "502 — image storage (Cloudflare R2) is temporarily unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "STORAGE_ERROR",
+                "message": "Image storage is temporarily unavailable, please try again"
+              }
+            }
+          }
+        }
+      },
+      "StorageNotConfigured": {
+        "description": "503 — image storage is not configured on the server",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "STORAGE_NOT_CONFIGURED",
+                "message": "Image storage is not configured on the server (missing Cloudflare R2 settings)"
+              }
+            }
+          }
+        }
+      },
       "TooManyRequests": {
         "description": "429 — too many attempts",
         "content": {
@@ -1015,6 +1056,7 @@
                 "example": {
                   "status": "ok",
                   "database": "connected",
+                  "storage": "r2",
                   "timestamp": "2026-10-14T10:00:00.000Z"
                 }
               }
@@ -1330,7 +1372,7 @@
           "Me"
         ],
         "summary": "Upload / replace my profile picture",
-        "description": "Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB).",
+        "description": "Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB). The file is stored in Cloudflare R2; the old image file is removed.",
         "security": [
           {
             "bearerAuth": []
@@ -1391,6 +1433,12 @@
           },
           "413": {
             "$ref": "#/components/responses/FileTooLarge"
+          },
+          "502": {
+            "$ref": "#/components/responses/StorageError"
+          },
+          "503": {
+            "$ref": "#/components/responses/StorageNotConfigured"
           }
         }
       },
@@ -2204,7 +2252,7 @@
           "Posts"
         ],
         "summary": "Upload / replace the post image (owner only)",
-        "description": "Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB).",
+        "description": "Send `multipart/form-data` with one file in the field **image** (JPG/PNG/WEBP, max 2MB). The file is stored in Cloudflare R2; the old image file is removed.",
         "security": [
           {
             "bearerAuth": []
@@ -2290,6 +2338,12 @@
           },
           "413": {
             "$ref": "#/components/responses/FileTooLarge"
+          },
+          "502": {
+            "$ref": "#/components/responses/StorageError"
+          },
+          "503": {
+            "$ref": "#/components/responses/StorageNotConfigured"
           }
         }
       },
@@ -2912,7 +2966,7 @@
           "Images"
         ],
         "summary": "Get an uploaded image file",
-        "description": "Public (an <img> tag cannot send a token). Ids are random UUIDs that cannot be guessed. Use the `imageUrl` / `avatarUrl` you got from other endpoints.",
+        "description": "Public (an <img> tag cannot send a token). Ids are random UUIDs that cannot be guessed.\nUse the `imageUrl` / `avatarUrl` you got from other endpoints directly in `<img src>`.\n\n- Images stored in **Cloudflare R2** answer **302** with a short-lived signed URL; browsers follow it automatically.\n- Older images not migrated yet are sent directly (**200**).\n\n_Swagger \"Try it out\" may show the redirect as a network error because of CORS — open the URL in a new tab instead._",
         "parameters": [
           {
             "name": "id",
@@ -2926,7 +2980,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The image file",
+            "description": "The image file (legacy images stored in the database)",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -2948,8 +3002,26 @@
               }
             }
           },
+          "302": {
+            "description": "Redirect to the image in Cloudflare R2 (signed URL, valid for a limited time)",
+            "headers": {
+              "Location": {
+                "description": "Temporary URL of the image file",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            }
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "502": {
+            "$ref": "#/components/responses/StorageError"
+          },
+          "503": {
+            "$ref": "#/components/responses/StorageNotConfigured"
           }
         }
       }
