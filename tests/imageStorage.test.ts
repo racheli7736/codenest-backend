@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { env } from '../src/config/env';
 import { NotConfiguredStorage, getStorage, setStorageForTests } from '../src/lib/storage';
 import { R2Storage } from '../src/lib/storage/r2Storage';
 import { findOrphanedObjects } from '../src/modules/images/imageMigration';
@@ -54,15 +55,43 @@ describe('Images are stored in object storage (Cloudflare R2), not in PostgreSQL
     expect(stored?.contentType).toBe('image/png');
   });
 
-  it('download: answers 302 with a temporary signed URL when the storage supports it', async () => {
+  it('download (default IMAGE_DELIVERY=proxy): the API sends the file itself from a stable URL', async () => {
+    const me = await createUser();
+    const url: string = (await uploadAvatar(me.auth)).body.user.avatarUrl;
+    memoryStorage().redirectBaseUrl = 'https://bucket.example.r2.cloudflarestorage.com'; // would redirect if allowed
+
+    const first = await api().get(url).redirects(0);
+    expect(first.status).toBe(200); // no redirect: the URL the browser sees never changes
+    expect(first.headers['content-type']).toBe('image/png');
+    expect(first.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    expect(Buffer.compare(first.body as Buffer, PNG_IMAGE)).toBe(0);
+
+    const second = await api().get(url).redirects(0);
+    expect(second.status).toBe(200);
+    expect(Buffer.compare(second.body as Buffer, PNG_IMAGE)).toBe(0);
+  });
+
+  it('download with IMAGE_DELIVERY=redirect: answers 302 with a temporary signed URL', async () => {
     const me = await createUser();
     const url: string = (await uploadAvatar(me.auth)).body.user.avatarUrl;
     memoryStorage().redirectBaseUrl = 'https://bucket.example.r2.cloudflarestorage.com';
+    env.IMAGE_DELIVERY = 'redirect';
+    try {
+      const res = await api().get(url).redirects(0);
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toMatch(/^https:\/\/bucket\.example\.r2\.cloudflarestorage\.com\/images\/.+\.png\?signature=/);
+      expect(res.headers['cache-control']).toBe('private, max-age=300');
+    } finally {
+      env.IMAGE_DELIVERY = 'proxy';
+    }
+  });
 
-    const res = await api().get(url).redirects(0);
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toMatch(/^https:\/\/bucket\.example\.r2\.cloudflarestorage\.com\/images\/.+\.png\?signature=/);
-    expect(res.headers['cache-control']).toBe('private, max-age=300');
+  it('a database row whose file is missing in storage answers 404 (not a crash)', async () => {
+    const me = await createUser();
+    const url: string = (await uploadAvatar(me.auth)).body.user.avatarUrl;
+    memoryStorage().objects.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect((await api().get(url)).status).toBe(404);
   });
 
   it('replace: the old file is deleted from storage, only the new one remains', async () => {
@@ -160,7 +189,7 @@ describe('Failures keep PostgreSQL and storage consistent', () => {
   it('storage down while serving an image → 502 with a clear error', async () => {
     const me = await createUser();
     const url: string = (await uploadAvatar(me.auth)).body.user.avatarUrl;
-    memoryStorage().failOn('url');
+    memoryStorage().failOn('get', 'url');
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const res = await api().get(url);

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   backupLegacyImages,
   deleteOrphanedObjects,
@@ -13,6 +13,7 @@ import {
 import { JPEG_IMAGE, PNG_IMAGE, api, createCategory, createUser, memoryStorage, prisma, resetDatabase } from './helpers';
 
 beforeEach(resetDatabase);
+afterEach(() => vi.restoreAllMocks());
 
 /** Images exactly as the old version stored them: bytes in PostgreSQL, no storage key. */
 async function createLegacyImages() {
@@ -69,9 +70,13 @@ describe('Migrating legacy images from PostgreSQL to R2', () => {
     const fetchedPost = await api().get(`/api/posts/${post.id}`).set('Authorization', owner.auth);
     expect(fetchedPost.body.post.imageUrl).toMatch(/^\/api\/images\//);
 
-    memoryStorage().redirectBaseUrl = 'https://r2.example';
     const res = await api().get(`/api/images/${avatar.id}`).redirects(0);
-    expect(res.status).toBe(302); // now served from R2
+    expect(res.status).toBe(200); // now served from R2 (proxied by the API, same URL as before)
+    expect(Buffer.compare(res.body as Buffer, PNG_IMAGE)).toBe(0);
+    // Proof it comes from storage and not from the old database bytes:
+    memoryStorage().objects.clear();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect((await api().get(`/api/images/${avatar.id}`)).status).toBe(404);
   });
 
   it('a failed upload is reported and the row stays a working legacy image', async () => {

@@ -41,8 +41,15 @@ const envSchema = z.object({
   R2_ENDPOINT: optionalUrl,
   /** Optional public bucket URL / custom domain. When set, images are served from it instead of signed URLs. */
   R2_PUBLIC_BASE_URL: optionalUrl,
-  /** How long a signed image URL stays valid. */
+  /** How long a signed image URL stays valid (only used with IMAGE_DELIVERY=redirect). */
   IMAGE_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(604800).default(3600),
+  /**
+   * How GET /api/images/:id serves files stored in R2:
+   *  - "proxy" (default): the API streams the file itself, so the image URL never changes
+   *    (friendly to caches and content filters that approve images per URL).
+   *  - "redirect": 302 to a short-lived signed R2 URL (less load on the API, but the URL changes).
+   */
+  IMAGE_DELIVERY: z.enum(['proxy', 'redirect']).default('proxy'),
 });
 
 function loadEnv() {

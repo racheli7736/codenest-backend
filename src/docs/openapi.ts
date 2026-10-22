@@ -1033,17 +1033,16 @@ export const openApiDocument = {
           'Public (an <img> tag cannot send a token). Ids are random UUIDs that cannot be guessed.',
           'Use the `imageUrl` / `avatarUrl` you got from other endpoints directly in `<img src>`.',
           '',
-          '- Images stored in **Cloudflare R2** answer **302** with a short-lived signed URL; browsers follow it automatically.',
-          '- Older images not migrated yet are sent directly (**200**).',
-          '',
-          '_Swagger "Try it out" may show the redirect as a network error because of CORS — open the URL in a new tab instead._',
+          '- By default (`IMAGE_DELIVERY=proxy`) the API sends the file itself (**200**). The URL never changes, so it can be cached forever.',
+          '- With `IMAGE_DELIVERY=redirect`, images stored in Cloudflare R2 answer **302** with a short-lived signed URL.',
+          '- Older images not migrated to R2 yet are sent directly from the database (**200**).',
         ].join('\n'),
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
         responses: {
           200: {
-            description: 'The image file (legacy images stored in the database)',
+            description: 'The image file (from Cloudflare R2 through the API, or a legacy image from the database)',
             content: {
               'image/jpeg': { schema: { type: 'string', format: 'binary' } },
               'image/png': { schema: { type: 'string', format: 'binary' } },
@@ -1051,7 +1050,7 @@ export const openApiDocument = {
             },
           },
           302: {
-            description: 'Redirect to the image in Cloudflare R2 (signed URL, valid for a limited time)',
+            description: 'Only when IMAGE_DELIVERY=redirect: redirect to the image in Cloudflare R2 (signed URL, valid for a limited time)',
             headers: {
               Location: { description: 'Temporary URL of the image file', schema: { type: 'string', format: 'uri' } },
             },
