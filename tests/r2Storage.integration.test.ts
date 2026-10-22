@@ -7,6 +7,7 @@
  */
 import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { env } from '../src/config/env';
 import { getStorage, setStorageForTests } from '../src/lib/storage';
 import { R2Storage } from '../src/lib/storage/r2Storage';
 import { migrateLegacyImages, verifyStoredImages } from '../src/modules/images/imageMigration';
@@ -74,10 +75,21 @@ describe.skipIf(!endpoint)('R2Storage against a real S3-compatible server', () =
       .attach('image', PNG_IMAGE, { filename: 'me.png', contentType: 'image/png' });
     expect(upload.status).toBe(200);
 
-    const redirect = await api().get(upload.body.user.avatarUrl).redirects(0);
-    expect(redirect.status).toBe(302);
-    const file = await fetch(redirect.headers.location as string);
-    expect(Buffer.compare(Buffer.from(await file.arrayBuffer()), PNG_IMAGE)).toBe(0);
+    // Default (proxy): the API streams the file from the bucket
+    const proxied = await api().get(upload.body.user.avatarUrl).redirects(0);
+    expect(proxied.status).toBe(200);
+    expect(Buffer.compare(proxied.body as Buffer, PNG_IMAGE)).toBe(0);
+
+    // IMAGE_DELIVERY=redirect: 302 to a signed URL that serves the same bytes
+    env.IMAGE_DELIVERY = 'redirect';
+    try {
+      const redirect = await api().get(upload.body.user.avatarUrl).redirects(0);
+      expect(redirect.status).toBe(302);
+      const file = await fetch(redirect.headers.location as string);
+      expect(Buffer.compare(Buffer.from(await file.arrayBuffer()), PNG_IMAGE)).toBe(0);
+    } finally {
+      env.IMAGE_DELIVERY = 'proxy';
+    }
 
     const row = await prisma.image.findFirstOrThrow();
     await api().delete('/api/users/me/avatar').set('Authorization', me.auth).expect(204);
