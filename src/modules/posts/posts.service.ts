@@ -1,6 +1,6 @@
 import type { Prisma, Role } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-import { badRequest, forbidden, notFound } from '../../utils/httpError';
+import { badRequest, forbidden, notFound, unauthorized } from '../../utils/httpError';
 import { buildPage, toSkipTake } from '../../utils/pagination';
 import { getStorageKeys, removeStoredObjects, uploadAndLinkImage } from '../images/images.service';
 import { postInclude, toPostResponse } from './posts.serializer';
@@ -26,13 +26,17 @@ export async function findPostOrThrow(postId: number) {
   return post;
 }
 
-async function loadPost(postId: number, viewerId: number) {
+async function loadPost(postId: number, viewerId: number | null) {
   const post = await prisma.post.findUnique({ where: { id: postId }, include: postInclude(viewerId) });
   if (!post) throw notFound('Post');
   return toPostResponse(post);
 }
 
-export async function listPosts(viewer: Viewer, query: ListPostsQuery) {
+/** `viewer` is null for guests: they can read, but not use the "following" feed. */
+export async function listPosts(viewer: Viewer | null, query: ListPostsQuery) {
+  if (query.feed === 'following' && !viewer) {
+    throw unauthorized('Log in to see posts from people you follow', 'TOKEN_MISSING');
+  }
   const where: Prisma.PostWhereInput = {
     ...(query.search
       ? {
@@ -46,7 +50,7 @@ export async function listPosts(viewer: Viewer, query: ListPostsQuery) {
     ...(query.language ? { language: query.language } : {}),
     ...(query.authorId ? { authorId: query.authorId } : {}),
     // "following" feed: only posts whose author is followed by me
-    ...(query.feed === 'following' ? { author: { followers: { some: { followerId: viewer.id } } } } : {}),
+    ...(query.feed === 'following' && viewer ? { author: { followers: { some: { followerId: viewer.id } } } } : {}),
   };
 
   const orderBy: Prisma.PostOrderByWithRelationInput[] =
@@ -59,7 +63,7 @@ export async function listPosts(viewer: Viewer, query: ListPostsQuery) {
     prisma.post.findMany({
       where,
       orderBy,
-      include: postInclude(viewer.id),
+      include: postInclude(viewer?.id ?? null),
       ...toSkipTake(query.page, query.limit),
     }),
   ]);
@@ -67,8 +71,8 @@ export async function listPosts(viewer: Viewer, query: ListPostsQuery) {
   return buildPage(posts.map(toPostResponse), total, query.page, query.limit);
 }
 
-export function getPost(viewer: Viewer, postId: number) {
-  return loadPost(postId, viewer.id);
+export function getPost(viewer: Viewer | null, postId: number) {
+  return loadPost(postId, viewer?.id ?? null);
 }
 
 export async function createPost(viewer: Viewer, input: CreatePostInput) {

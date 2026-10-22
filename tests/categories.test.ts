@@ -4,7 +4,7 @@ import { api, createCategory, createPost, createUser, resetDatabase } from './he
 beforeEach(resetDatabase);
 
 describe('Categories', () => {
-  it('any logged-in user can list categories (sorted, with post counts)', async () => {
+  it('anyone (also guests) can list categories (sorted, with post counts)', async () => {
     const user = await createUser();
     const tips = await createCategory('Tips');
     await createCategory('Architecture');
@@ -15,7 +15,7 @@ describe('Categories', () => {
     expect(res.body.items.map((c: { name: string }) => c.name)).toEqual(['Architecture', 'Tips']);
     expect(res.body.items[1].postsCount).toBe(1);
 
-    expect((await api().get('/api/categories')).status).toBe(401);
+    expect((await api().get('/api/categories')).status).toBe(200); // public
   });
 
   it('only admins can create (user → 403, admin → 201)', async () => {

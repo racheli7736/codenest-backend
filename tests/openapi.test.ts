@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { openApiDocument } from '../src/docs/openapi';
 import { api } from './helpers';
 
-type Operation = { security?: unknown[] };
+type Operation = { security?: Record<string, unknown>[] };
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 function operations() {
@@ -13,7 +13,9 @@ function operations() {
       const op = item[method];
       if (!op) continue;
       const url = path.replace('{id}', path.startsWith('/api/images') ? '00000000-0000-4000-8000-000000000000' : '1');
-      result.push({ method, path, url, secured: Array.isArray(op.security) && op.security.length > 0 });
+      // "{}" in the security list means the endpoint also works without a token (public read)
+      const secured = Array.isArray(op.security) && op.security.length > 0 && !op.security.some((s) => Object.keys(s).length === 0);
+      result.push({ method, path, url, secured });
     }
   }
   return result;
@@ -59,6 +61,8 @@ describe('Swagger / OpenAPI', () => {
       expect(routeMissing, `${op.method.toUpperCase()} ${op.path} is documented but not implemented`).toBe(false);
       if (op.secured) {
         expect(res.status, `${op.method.toUpperCase()} ${op.path} should require a token`).toBe(401);
+      } else {
+        expect(res.status, `${op.method.toUpperCase()} ${op.path} should be public`).not.toBe(401);
       }
     }
   });

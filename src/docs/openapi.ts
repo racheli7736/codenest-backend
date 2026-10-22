@@ -14,6 +14,8 @@ const schemaRef = (name: string) => ({ $ref: `#/components/schemas/${name}` });
 const responseRef = (name: string) => ({ $ref: `#/components/responses/${name}` });
 const paramRef = (name: string) => ({ $ref: `#/components/parameters/${name}` });
 const bearer = [{ bearerAuth: [] }];
+/** Public endpoint: works without a token; with a token the answer is personalised (likedByMe…). */
+const optionalBearer = [{}, { bearerAuth: [] }];
 
 function jsonBody(schema: object, example?: unknown) {
   return {
@@ -122,6 +124,8 @@ export const openApiDocument = {
       '2. Copy the `token` from the response.',
       '3. Click the green **Authorize** button at the top, paste the token (without the word Bearer) and click **Authorize**.',
       '4. Now every 🔒 endpoint will send `Authorization: Bearer <token>` automatically.',
+      '',
+      'Reading posts, comments, categories and profiles is open to guests (no token). Liking, saving, commenting, following and creating require login.',
       '',
       'Every error has the same shape: `{ "error": { "code", "message", "details?" } }`.',
     ].join('\n'),
@@ -647,9 +651,9 @@ export const openApiDocument = {
     '/api/users/{id}': {
       get: {
         tags: ['Users'],
-        summary: "A user's public profile",
-        description: 'The email is returned only for your own profile or if you are an admin (otherwise null).',
-        security: bearer,
+        summary: "A user's public profile (🔓 also for guests)",
+        description: 'Works without a token. The email is returned only for your own profile or if you are an admin (otherwise null). Guests get isFollowedByMe=false and isMe=false.',
+        security: optionalBearer,
         parameters: [paramRef('IdPath')],
         responses: {
           200: jsonResponse(
@@ -676,8 +680,8 @@ export const openApiDocument = {
     '/api/users/{id}/followers': {
       get: {
         tags: ['Users'],
-        summary: 'People who follow this user',
-        security: bearer,
+        summary: 'People who follow this user (🔓 also for guests)',
+        security: optionalBearer,
         parameters: [paramRef('IdPath'), paramRef('Page'), paramRef('Limit')],
         responses: {
           200: jsonResponse('Followers', schemaRef('ListedUserPage'),
@@ -691,8 +695,8 @@ export const openApiDocument = {
     '/api/users/{id}/following': {
       get: {
         tags: ['Users'],
-        summary: 'People this user follows',
-        security: bearer,
+        summary: 'People this user follows (🔓 also for guests)',
+        security: optionalBearer,
         parameters: [paramRef('IdPath'), paramRef('Page'), paramRef('Limit')],
         responses: {
           200: jsonResponse('Following', schemaRef('ListedUserPage'),
@@ -737,9 +741,9 @@ export const openApiDocument = {
     '/api/posts': {
       get: {
         tags: ['Posts'],
-        summary: 'List posts — search, filter, sort and pages',
-        description: 'All filters can be combined. Example: `/api/posts?search=react&language=TYPESCRIPT&sort=popular`',
-        security: bearer,
+        summary: 'List posts — search, filter, sort and pages (🔓 also for guests)',
+        description: 'Works without a token (guests: likedByMe/savedByMe are false). `feed=following` requires login. All filters can be combined. Example: `/api/posts?search=react&language=TYPESCRIPT&sort=popular`',
+        security: optionalBearer,
         parameters: [
           { name: 'search', in: 'query', schema: { type: 'string', maxLength: 100 }, description: 'Text in title or content (case-insensitive)' },
           { name: 'categoryId', in: 'query', schema: { type: 'integer' } },
@@ -779,8 +783,8 @@ export const openApiDocument = {
     '/api/posts/{id}': {
       get: {
         tags: ['Posts'],
-        summary: 'Get one post',
-        security: bearer,
+        summary: 'Get one post (🔓 also for guests)',
+        security: optionalBearer,
         parameters: [paramRef('IdPath')],
         responses: {
           200: jsonResponse('The post', { type: 'object', properties: { post: schemaRef('Post') } }, { post: postExample }),
@@ -912,8 +916,8 @@ export const openApiDocument = {
     '/api/posts/{id}/comments': {
       get: {
         tags: ['Comments'],
-        summary: 'Comments of a post (oldest first)',
-        security: bearer,
+        summary: 'Comments of a post, oldest first (🔓 also for guests)',
+        security: optionalBearer,
         parameters: [paramRef('IdPath'), paramRef('Page'), paramRef('Limit')],
         responses: {
           200: jsonResponse('A page of comments', schemaRef('CommentPage'), page([commentExample])),
@@ -956,8 +960,8 @@ export const openApiDocument = {
     '/api/categories': {
       get: {
         tags: ['Categories'],
-        summary: 'All categories (for filters and the post form)',
-        security: bearer,
+        summary: 'All categories for filters and the post form (🔓 also for guests)',
+        security: optionalBearer,
         responses: {
           200: jsonResponse(
             'Categories sorted by name',

@@ -95,19 +95,20 @@ export async function listUsers(query: ListUsersQuery) {
   return buildPage(items, total, query.page, query.limit);
 }
 
-/** A public profile. The email is shown only to the owner and to admins. */
-export async function getProfile(viewer: Viewer, userId: number) {
+/** A public profile (guests too: viewer = null). The email is shown only to the owner and to admins. */
+export async function getProfile(viewer: Viewer | null, userId: number) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       ...currentUserSelect,
       _count: { select: { posts: true, followers: true, following: true } },
-      followers: { where: { followerId: viewer.id }, select: { followerId: true } },
+      followers: { where: { followerId: viewer?.id ?? 0 }, select: { followerId: true } }, // 0 = guest, matches nobody
     },
   });
   if (!user) throw notFound('User');
 
-  const canSeeEmail = viewer.id === user.id || viewer.role === 'ADMIN';
+  const isMe = viewer?.id === user.id;
+  const canSeeEmail = isMe || viewer?.role === 'ADMIN';
   return {
     id: user.id,
     name: user.name,
@@ -120,7 +121,7 @@ export async function getProfile(viewer: Viewer, userId: number) {
     followersCount: user._count.followers,
     followingCount: user._count.following,
     isFollowedByMe: user.followers.length > 0,
-    isMe: viewer.id === user.id,
+    isMe,
   };
 }
 
