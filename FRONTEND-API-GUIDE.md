@@ -25,7 +25,7 @@
 1. המשתמש נרשם (`POST /api/auth/register`) או מתחבר (`POST /api/auth/login`).
 2. השרת מחזיר **`token`** (JWT) ואת פרטי המשתמש (**`user`**).
 3. שומרים את ה־token בצד הלקוח, למשל ב־`localStorage`.
-4. **בכל בקשה** לשרת (חוץ מהרשמה, התחברות ו־health) שולחים כותרת:
+4. **בכל בקשה** לשרת, כשיש token שמור, שולחים כותרת:
    ```
    Authorization: Bearer <token>
    ```
@@ -163,17 +163,17 @@ Content-Type: application/json
 | Method | URL | הרשאה | הצלחה |
 |---|---|:-:|---|
 | GET | `/api/users?search=&page=&limit=` | 👑 | `200 Page<CurrentUser + postsCount>` |
-| GET | `/api/users/:id` | 🔑 | `200 { user: UserProfile }` |
-| GET | `/api/users/:id/followers` | 🔑 | `200 Page<ListedUser>` |
-| GET | `/api/users/:id/following` | 🔑 | `200 Page<ListedUser>` |
+| GET | `/api/users/:id` | 🔓 | `200 { user: UserProfile }` |
+| GET | `/api/users/:id/followers` | 🔓 | `200 Page<ListedUser>` |
+| GET | `/api/users/:id/following` | 🔓 | `200 Page<ListedUser>` |
 | POST | `/api/users/:id/follow` | 🔑 | `204` |
 | DELETE | `/api/users/:id/follow` | 🔑 | `204` |
 
 ### פוסטים
 | Method | URL | הרשאה | Body | הצלחה |
 |---|---|:-:|---|---|
-| GET | `/api/posts` | 🔑 | פרמטרים, ראי למטה | `200 Page<Post>` |
-| GET | `/api/posts/:id` | 🔑 | – | `200 { post }` |
+| GET | `/api/posts` | 🔓 | פרמטרים, ראי למטה | `200 Page<Post>` |
+| GET | `/api/posts/:id` | 🔓 | – | `200 { post }` |
 | POST | `/api/posts` | 🔑 | `{ title, content, codeSnippet?, language?, categoryId }` | `201 { post }` |
 | PATCH | `/api/posts/:id` | 🔑 רק הכותב/ת | שדות לעדכון | `200 { post }` |
 | DELETE | `/api/posts/:id` | 🔑 כותב/ת או 👑 | – | `204` |
@@ -200,14 +200,14 @@ Content-Type: application/json
 ### תגובות
 | Method | URL | הרשאה | Body | הצלחה |
 |---|---|:-:|---|---|
-| GET | `/api/posts/:id/comments` | 🔑 | `?page&limit` | `200 Page<Comment>` (הישנה ראשונה) |
+| GET | `/api/posts/:id/comments` | 🔓 | `?page&limit` | `200 Page<Comment>` (הישנה ראשונה) |
 | POST | `/api/posts/:id/comments` | 🔑 | `{ content }` | `201 { comment }` |
 | DELETE | `/api/comments/:id` | 🔑 כותב/ת או 👑 | – | `204` |
 
 ### קטגוריות
 | Method | URL | הרשאה | Body | הצלחה |
 |---|---|:-:|---|---|
-| GET | `/api/categories` | 🔑 | – | `200 { items: Category[] }` (בלי עמודים) |
+| GET | `/api/categories` | 🔓 | – | `200 { items: Category[] }` (בלי עמודים) |
 | POST | `/api/categories` | 👑 | `{ name, description? }` | `201 { category }` |
 | PATCH | `/api/categories/:id` | 👑 | `{ name?, description? }` | `200 { category }` |
 | DELETE | `/api/categories/:id` | 👑 | – | `204`, או `409` אם יש בה פוסטים |
@@ -359,16 +359,21 @@ Content-Type: application/json
 
 ## 9. סיכום הרשאות
 
-| פעולה | משתמש רגיל | מנהל |
-|---|:-:|:-:|
-| צפייה בפוסטים, תגובות, פרופילים וקטגוריות | ✅ | ✅ |
-| יצירת פוסט, תגובה, לייק, שמירה, מעקב | ✅ | ✅ |
-| עריכת פוסט | רק שלי | רק שלו/שלה |
-| מחיקת פוסט או תגובה | רק שלי | **הכול** |
-| הפוסטים השמורים | רק שלי | רק שלו/שלה |
-| אימייל של משתמשים אחרים | ❌ (`null`) | ✅ |
-| ניהול קטגוריות | ❌ 403 | ✅ |
-| רשימת כל המשתמשים | ❌ 403 | ✅ |
+| פעולה | אורחת (בלי token) | משתמש רגיל | מנהל |
+|---|:-:|:-:|:-:|
+| צפייה בפוסטים, תגובות, פרופילים, עוקבים וקטגוריות | ✅ | ✅ | ✅ |
+| פיד "ממי שאני עוקבת" (`feed=following`) | ❌ 401 | ✅ | ✅ |
+| יצירת פוסט, תגובה, לייק, שמירה, מעקב | ❌ 401 | ✅ | ✅ |
+| עריכת פוסט | ❌ 401 | רק שלי | רק שלו/שלה |
+| מחיקת פוסט או תגובה | ❌ 401 | רק שלי | **הכול** |
+| הפוסטים השמורים, האזור האישי | ❌ 401 | רק שלי | רק שלו/שלה |
+| אימייל של משתמשים אחרים | ❌ (`null`) | ❌ (`null`) | ✅ |
+| ניהול קטגוריות | ❌ 401 | ❌ 403 | ✅ |
+| רשימת כל המשתמשים | ❌ 401 | ❌ 403 | ✅ |
+
+**מה אורחת מקבלת בעמודים הציבוריים:** `likedByMe: false`, `savedByMe: false`, `isFollowedByMe: false`, `isMe: false`.
+💡 **טיפ ל־UI:** כשאורחת לוחצת על לייק, שמירה, תגובה או מעקב, עדיף להעביר אותה למסך ההתחברות (או להציג "יש להתחבר"), במקום לשלוח בקשה ולקבל 401.
+⚠️ אם נשלח token **פג תוקף** גם לעמוד ציבורי, השרת מחזיר 401. כך האפליקציה יודעת לנתק את המשתמשת ולמחוק את ה־token.
 
 **טיפ ל־UI:** הציגי כפתורי "ערוך" ו"מחק" רק כש־`post.author.id === user.id` (ומחיקה גם כש־`user.role === "ADMIN"`). השרת חוסם בכל מקרה, אבל כך המשתמש לא רואה כפתורים שלא יעבדו.
 

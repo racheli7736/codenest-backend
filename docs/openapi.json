@@ -3,7 +3,7 @@
   "info": {
     "title": "CodeNest API",
     "version": "1.0.0",
-    "description": "REST API for **CodeNest** — a knowledge-sharing social network for programmers.\n\n### How to try protected endpoints\n1. Open **POST /api/auth/login**, click **Try it out**, and log in (demo users are listed in the README).\n2. Copy the `token` from the response.\n3. Click the green **Authorize** button at the top, paste the token (without the word Bearer) and click **Authorize**.\n4. Now every 🔒 endpoint will send `Authorization: Bearer <token>` automatically.\n\nEvery error has the same shape: `{ \"error\": { \"code\", \"message\", \"details?\" } }`."
+    "description": "REST API for **CodeNest** — a knowledge-sharing social network for programmers.\n\n### How to try protected endpoints\n1. Open **POST /api/auth/login**, click **Try it out**, and log in (demo users are listed in the README).\n2. Copy the `token` from the response.\n3. Click the green **Authorize** button at the top, paste the token (without the word Bearer) and click **Authorize**.\n4. Now every 🔒 endpoint will send `Authorization: Bearer <token>` automatically.\n\nReading posts, comments, categories and profiles is open to guests (no token). Liking, saving, commenting, following and creating require login.\n\nEvery error has the same shape: `{ \"error\": { \"code\", \"message\", \"details?\" } }`."
   },
   "servers": [
     {
@@ -1605,9 +1605,10 @@
         "tags": [
           "Users"
         ],
-        "summary": "A user's public profile",
-        "description": "The email is returned only for your own profile or if you are an admin (otherwise null).",
+        "summary": "A user's public profile (🔓 also for guests)",
+        "description": "Works without a token. The email is returned only for your own profile or if you are an admin (otherwise null). Guests get isFollowedByMe=false and isMe=false.",
         "security": [
+          {},
           {
             "bearerAuth": []
           }
@@ -1666,8 +1667,9 @@
         "tags": [
           "Users"
         ],
-        "summary": "People who follow this user",
+        "summary": "People who follow this user (🔓 also for guests)",
         "security": [
+          {},
           {
             "bearerAuth": []
           }
@@ -1725,8 +1727,9 @@
         "tags": [
           "Users"
         ],
-        "summary": "People this user follows",
+        "summary": "People this user follows (🔓 also for guests)",
         "security": [
+          {},
           {
             "bearerAuth": []
           }
@@ -1860,9 +1863,10 @@
         "tags": [
           "Posts"
         ],
-        "summary": "List posts — search, filter, sort and pages",
-        "description": "All filters can be combined. Example: `/api/posts?search=react&language=TYPESCRIPT&sort=popular`",
+        "summary": "List posts — search, filter, sort and pages (🔓 also for guests)",
+        "description": "Works without a token (guests: likedByMe/savedByMe are false). `feed=following` requires login. All filters can be combined. Example: `/api/posts?search=react&language=TYPESCRIPT&sort=popular`",
         "security": [
+          {},
           {
             "bearerAuth": []
           }
@@ -2065,8 +2069,9 @@
         "tags": [
           "Posts"
         ],
-        "summary": "Get one post",
+        "summary": "Get one post (🔓 also for guests)",
         "security": [
+          {},
           {
             "bearerAuth": []
           }
@@ -2553,8 +2558,9 @@
         "tags": [
           "Comments"
         ],
-        "summary": "Comments of a post (oldest first)",
+        "summary": "Comments of a post, oldest first (🔓 also for guests)",
         "security": [
+          {},
           {
             "bearerAuth": []
           }
@@ -2720,8 +2726,9 @@
         "tags": [
           "Categories"
         ],
-        "summary": "All categories (for filters and the post form)",
+        "summary": "All categories for filters and the post form (🔓 also for guests)",
         "security": [
+          {},
           {
             "bearerAuth": []
           }

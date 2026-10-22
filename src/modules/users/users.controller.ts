@@ -34,7 +34,7 @@ export async function list(req: Request, res: Response) {
 
 export async function getProfile(req: Request, res: Response) {
   const { id } = idParamSchema.parse(req.params);
-  res.status(200).json({ user: await usersService.getProfile(getAuthUser(req), id) });
+  res.status(200).json({ user: await usersService.getProfile(req.user ?? null, id) });
 }
 
 export async function followers(req: Request, res: Response) {
